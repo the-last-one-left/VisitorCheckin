@@ -1,0 +1,10 @@
+# Resources Directory
+
+This directory stores orientation videos (if using video orientation mode).
+
+Supported formats:
+- MP4 (recommended)
+- WebM
+- MOV
+
+Files in this directory are protected by .gitignore and will not be committed to version control.

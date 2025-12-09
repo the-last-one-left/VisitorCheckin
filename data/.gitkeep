@@ -1,0 +1,10 @@
+# Data Directory
+
+This directory stores:
+- SQLite database (visitors.db)
+- System logs
+- Database backups
+
+Files in this directory are protected by .gitignore and will not be committed to version control.
+
+**IMPORTANT:** Ensure IIS_IUSRS has write permissions to this directory.
