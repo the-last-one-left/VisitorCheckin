@@ -13,9 +13,9 @@
  * 5. Training Alerts - Expiring/expired training notifications
  * 6. Database Information - System stats and maintenance tools
  * 
- * @package    SuterraGuestCheckin
+ * @package    VisitorManagement
  * @subpackage Admin
- * @author     Pacific Office Automation
+ * @author     Yeyland Wutani LLC <yeyland.wutani@tcpip.network>
  * @version    2.2
  * @since      2024-01-15
  */
@@ -24,14 +24,42 @@ require_once 'auth.php';
 
 // Require authentication
 requireAuth();
+
+// Load branding configuration
+$org_name = defined('ORG_NAME') ? ORG_NAME : 'Visitor Management System';
+$logo_path = defined('LOGO_PATH') ? '../' . LOGO_PATH : '../sut-primary-logo.svg';
+$color_primary = defined('COLOR_PRIMARY') ? COLOR_PRIMARY : '#0066CC';
+$color_secondary = defined('COLOR_SECONDARY') ? COLOR_SECONDARY : '#0052A3';
+
+// Extract RGB values for rgba() with opacity
+function hexToRgb($hex) {
+    $hex = ltrim($hex, '#');
+    return [
+        'r' => hexdec(substr($hex, 0, 2)),
+        'g' => hexdec(substr($hex, 2, 2)),
+        'b' => hexdec(substr($hex, 4, 2))
+    ];
+}
+
+$primary_rgb = hexToRgb($color_primary);
+$secondary_rgb = hexToRgb($color_secondary);
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Visitor Management</title>
+    <title>Admin Dashboard - <?php echo htmlspecialchars($org_name); ?></title>
     <style>
+        :root {
+            --color-primary: <?php echo $color_primary; ?>;
+            --color-secondary: <?php echo $color_secondary; ?>;
+            --color-primary-rgb: <?php echo $primary_rgb['r'] . ', ' . $primary_rgb['g'] . ', ' . $primary_rgb['b']; ?>;
+            --color-secondary-rgb: <?php echo $secondary_rgb['r'] . ', ' . $secondary_rgb['g'] . ', ' . $secondary_rgb['b']; ?>;
+            --gradient-primary: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+            --gradient-secondary: linear-gradient(135deg, var(--color-secondary) 0%, color-mix(in srgb, var(--color-secondary), white 15%) 100%);
+        }
+        
         * {
             margin: 0;
             padding: 0;
@@ -45,7 +73,7 @@ requireAuth();
         }
         
         .header {
-            background: linear-gradient(135deg, #5A7654 0%, #6B8668 100%);
+            background: var(--gradient-primary);
             color: white;
             padding: 30px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
@@ -78,7 +106,7 @@ requireAuth();
         }
         
         .btn {
-            background: linear-gradient(135deg, #5A7654 0%, #6B8668 100%);
+            background: var(--gradient-primary);
             color: white;
             padding: 12px 25px;
             border: none;
@@ -93,15 +121,15 @@ requireAuth();
         
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(90, 118, 84, 0.3);
+            box-shadow: 0 5px 15px rgba(var(--color-primary-rgb), 0.3);
         }
         
         .btn-success {
-            background: linear-gradient(135deg, #6B8668 0%, #7C9579 100%);
+            background: var(--gradient-secondary);
         }
         
         .btn-success:hover {
-            box-shadow: 0 5px 15px rgba(107, 134, 104, 0.3);
+            box-shadow: 0 5px 15px rgba(var(--color-secondary-rgb), 0.3);
         }
         
         .btn-danger {
@@ -146,7 +174,7 @@ requireAuth();
         }
         
         .db-action-card h4 {
-            color: #5A7654;
+            color: var(--color-primary);
             font-size: 1.3em;
             margin-bottom: 10px;
         }
@@ -171,7 +199,7 @@ requireAuth();
             padding: 15px;
             background: #f8f9f7;
             border-radius: 8px;
-            border-left: 4px solid #5A7654;
+            border-left: 4px solid var(--color-primary);
         }
         
         .info-label {
@@ -181,7 +209,7 @@ requireAuth();
         
         .info-value {
             font-weight: 700;
-            color: #5A7654;
+            color: var(--color-primary);
         }
         
         .container {
@@ -213,7 +241,7 @@ requireAuth();
         .stat-number {
             font-size: 3em;
             font-weight: 700;
-            color: #5A7654;
+            color: var(--color-primary);
             margin-bottom: 10px;
         }
         
@@ -235,8 +263,8 @@ requireAuth();
         .section-title {
             font-size: 1.8em;
             margin-bottom: 25px;
-            color: #5A7654;
-            border-bottom: 3px solid #6B8668;
+            color: var(--color-primary);
+            border-bottom: 3px solid var(--color-secondary);
             padding-bottom: 10px;
         }
         
@@ -261,7 +289,7 @@ requireAuth();
         th {
             background: #f8f9f7;
             font-weight: 600;
-            color: #5A7654;
+            color: var(--color-primary);
             position: sticky;
             top: 0;
             z-index: 10;
@@ -292,7 +320,7 @@ requireAuth();
         
         .duration {
             font-weight: 600;
-            color: #5A7654;
+            color: var(--color-primary);
         }
         
         .orientation-badge {
@@ -402,10 +430,10 @@ requireAuth();
         }
         
         .training-section h3 {
-            color: #5A7654;
+            color: var(--color-primary);
             margin-bottom: 15px;
             font-size: 1.4em;
-            border-bottom: 2px solid #5A7654;
+            border-bottom: 2px solid var(--color-primary);
             padding-bottom: 8px;
         }
         
@@ -424,7 +452,7 @@ requireAuth();
         
         .training-table th {
             background: #f8f9fa;
-            color: #5A7654;
+            color: var(--color-primary);
             font-weight: 600;
             padding: 12px;
             text-align: left;
@@ -504,8 +532,8 @@ requireAuth();
             font-size: 0.9em;
         }
         
-        .suterra-contact {
-            color: #5A7654;
+        .staff-contact {
+            color: var(--color-primary);
             font-weight: 500;
         }
         
@@ -552,10 +580,12 @@ requireAuth();
 <body>
     <div class="header">
         <div class="header-content">
-            <img src="../sut-primary-logo.svg" alt="Company Logo" class="logo">
+            <?php if (file_exists(__DIR__ . '/' . $logo_path)): ?>
+                <img src="<?php echo htmlspecialchars($logo_path); ?>" alt="<?php echo htmlspecialchars($org_name); ?>" class="logo">
+            <?php endif; ?>
             <div class="header-text">
                 <h1>Admin Dashboard</h1>
-                <p>Visitor Management System - Overview and Reports</p>
+                <p><?php echo htmlspecialchars($org_name); ?> - Overview and Reports</p>
             </div>
         </div>
         <div class="header-actions">
@@ -837,7 +867,7 @@ requireAuth();
                                     <tr>
                                         <td>${this.escapeHtml(visitor.name)}</td>
                                         <td>${this.escapeHtml(visitor.company)}</td>
-                                        <td class="suterra-contact">${visitor.suterra_contact ? this.escapeHtml(visitor.suterra_contact) : '-'}</td>
+                                        <td class="staff-contact">${visitor.suterra_contact ? this.escapeHtml(visitor.suterra_contact) : '-'}</td>
                                         <td>${this.escapeHtml(visitor.email)}</td>
                                         <td>${this.escapeHtml(visitor.phone)}</td>
                                         <td>${visitor.badge_number ? this.escapeHtml(visitor.badge_number) : '-'}</td>
@@ -883,7 +913,7 @@ requireAuth();
                                     <tr>
                                         <td>${this.escapeHtml(visit.name)}</td>
                                         <td>${this.escapeHtml(visit.company)}</td>
-                                        <td class="suterra-contact">${visit.suterra_contact ? this.escapeHtml(visit.suterra_contact) : '-'}</td>
+                                        <td class="staff-contact">${visit.suterra_contact ? this.escapeHtml(visit.suterra_contact) : '-'}</td>
                                         <td>${this.escapeHtml(visit.email)}</td>
                                         <td>${this.formatDateTime(visit.check_in_time)}</td>
                                         <td>${visit.check_out_time ? this.formatDateTime(visit.check_out_time) : '-'}</td>

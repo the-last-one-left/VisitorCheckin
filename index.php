@@ -2,7 +2,7 @@
 /**
  * Visitor Check-In Interface - Main Entry Point
  * 
- * Primary visitor-facing interface for the Suterra Guest Check-in System.
+ * Primary visitor-facing interface for the visitor management system.
  * Provides touch-friendly tablet interface for visitor registration, check-in,
  * and check-out functionality.
  * 
@@ -10,18 +10,21 @@
  * - Dual visitor type support (Contractor/General Visitor)
  * - Auto-fill for returning visitors
  * - Real-time phone/email validation
- * - Smartsheet integration for contractor training
+ * - External form integration for contractor training
  * - Current visitor display with check-out capability
  * 
  * Flow Logic:
- * - Contractors (new/expired training): Pre-filled Smartsheet form → Check in
+ * - Contractors (new/expired training): Pre-filled external form → Check in
  * - Contractors (valid training): Direct check in
  * - Visitors (any): Direct check in
  * 
- * @package    SuterraGuestCheckin
- * @author     Pacific Office Automation
+ * @package    VisitorManagement
+ * @author     Yeyland Wutani LLC <yeyland.wutani@tcpip.network>
  * @version    2.1
  */
+
+// Load configuration
+require_once __DIR__ . '/config/loader.php';
 
 // ============================================================================
 // DATABASE INITIALIZATION CHECK
@@ -29,21 +32,57 @@
 // ============================================================================
 
 if (!file_exists(__DIR__ . '/data/visitors.db')) {
-    if (file_exists(__DIR__ . '/setup.php')) {
-        header('Location: setup.php');
+    if (file_exists(__DIR__ . '/setup/index.php')) {
+        header('Location: setup/');
         exit;
     } else {
-        die('Database not found. Please run setup.php first.');
+        die('Database not found. Please run setup first.');
     }
 }
+
+// Load branding configuration
+$org_name = defined('ORG_NAME') ? ORG_NAME : 'Visitor Management System';
+$org_tagline = defined('ORG_TAGLINE') ? ORG_TAGLINE : 'Welcome! Please check in below or find your name to check out.';
+$logo_path = defined('LOGO_PATH') ? LOGO_PATH : 'sut-primary-logo.svg';
+$color_primary = defined('COLOR_PRIMARY') ? COLOR_PRIMARY : '#0066CC';
+$color_secondary = defined('COLOR_SECONDARY') ? COLOR_SECONDARY : '#0052A3';
+$color_accent = defined('COLOR_ACCENT') ? COLOR_ACCENT : '#8B4513';
+
+// Get staff contacts for dropdown
+$staff_contacts = function_exists('get_staff_contacts') ? get_staff_contacts() : [];
+
+// Extract RGB values for rgba() with opacity
+function hexToRgb($hex) {
+    $hex = ltrim($hex, '#');
+    return [
+        'r' => hexdec(substr($hex, 0, 2)),
+        'g' => hexdec(substr($hex, 2, 2)),
+        'b' => hexdec(substr($hex, 4, 2))
+    ];
+}
+
+$primary_rgb = hexToRgb($color_primary);
+$secondary_rgb = hexToRgb($color_secondary);
+$accent_rgb = hexToRgb($color_accent);
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visitor Check-in System</title>
+    <title><?php echo htmlspecialchars($org_name); ?> - Visitor Check-in</title>
     <style>
+        :root {
+            --color-primary: <?php echo $color_primary; ?>;
+            --color-secondary: <?php echo $color_secondary; ?>;
+            --color-accent: <?php echo $color_accent; ?>;
+            --color-primary-rgb: <?php echo $primary_rgb['r'] . ', ' . $primary_rgb['g'] . ', ' . $primary_rgb['b']; ?>;
+            --color-secondary-rgb: <?php echo $secondary_rgb['r'] . ', ' . $secondary_rgb['g'] . ', ' . $secondary_rgb['b']; ?>;
+            --color-accent-rgb: <?php echo $accent_rgb['r'] . ', ' . $accent_rgb['g'] . ', ' . $accent_rgb['b']; ?>;
+            --gradient-primary: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+            --gradient-accent: linear-gradient(135deg, var(--color-accent) 0%, color-mix(in srgb, var(--color-accent), white 15%) 100%);
+        }
+        
         * {
             margin: 0;
             padding: 0;
@@ -52,7 +91,7 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #5A7654 0%, #6B8668 100%);
+            background: var(--gradient-primary);
             min-height: 100vh;
             padding: 20px;
             touch-action: manipulation;
@@ -69,7 +108,7 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
         }
         
         .header {
-            background: linear-gradient(135deg, #5A7654 0%, #6B8668 100%);
+            background: var(--gradient-primary);
             color: white;
             padding: 30px;
             text-align: center;
@@ -144,7 +183,7 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
             font-size: 1.8em;
             margin-bottom: 30px;
             color: #333;
-            border-bottom: 3px solid #5A7654;
+            border-bottom: 3px solid var(--color-primary);
             padding-bottom: 10px;
         }
         
@@ -171,7 +210,7 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
         
         .form-group input:focus, .form-group select:focus {
             outline: none;
-            border-color: #5A7654;
+            border-color: var(--color-primary);
         }
         
         /* Number pad for phone and badge number */
@@ -199,7 +238,7 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
         }
         
         .btn {
-            background: linear-gradient(135deg, #5A7654 0%, #6B8668 100%);
+            background: var(--gradient-primary);
             color: white;
             padding: 18px 40px;
             border: none;
@@ -214,7 +253,7 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
         
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(90, 118, 84, 0.3);
+            box-shadow: 0 10px 20px rgba(var(--color-primary-rgb), 0.3);
         }
         
         .btn:active {
@@ -257,7 +296,7 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
         }
         
         .visitor-card:hover {
-            border-color: #5A7654;
+            border-color: var(--color-primary);
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         }
@@ -282,7 +321,7 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
         }
         
         .checkout-btn {
-            background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+            background: var(--gradient-accent);
             color: white;
             padding: 12px 25px;
             border: none;
@@ -296,7 +335,7 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
         
         .checkout-btn:hover {
             transform: translateY(-1px);
-            box-shadow: 0 5px 10px rgba(139, 69, 19, 0.3);
+            box-shadow: 0 5px 10px rgba(var(--color-accent-rgb), 0.3);
         }
         
         .alert {
@@ -325,7 +364,7 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
         }
         
         .visitor-count {
-            background: #5A7654;
+            background: var(--color-primary);
             color: white;
             padding: 10px 20px;
             border-radius: 50px;
@@ -382,10 +421,12 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
         <div class="header">
             <a href="admin/" class="admin-link">Admin Dashboard</a>
             <div class="header-content">
-                <img src="sut-primary-logo.svg" alt="Company Logo" class="logo">
+                <?php if (file_exists(__DIR__ . '/' . $logo_path)): ?>
+                    <img src="<?php echo htmlspecialchars($logo_path); ?>" alt="<?php echo htmlspecialchars($org_name); ?>" class="logo">
+                <?php endif; ?>
                 <div class="header-text">
-                    <h1>Visitor Management System</h1>
-                    <p>Welcome! Please check in below or find your name to check out.</p>
+                    <h1><?php echo htmlspecialchars($org_name); ?></h1>
+                    <p><?php echo htmlspecialchars($org_tagline); ?></p>
                 </div>
             </div>
         </div>
@@ -435,23 +476,11 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
                         
                         <div class="form-group">
                             <label for="suterra_contact">Who are you visiting? <span class="optional">(Optional)</span></label>
-                            <input type="text" id="suterra_contact" name="suterra_contact" list="suterra-contacts" placeholder="Start typing name...">
-                            <datalist id="suterra-contacts">
-                                <option value="Aman Khapoya">
-                                <option value="Cheyne Detwiler">
-                                <option value="Chris Henry">
-                                <option value="Cody Moore">
-                                <option value="Graydon Olson">
-                                <option value="Jackie Graybeal">
-                                <option value="Jason Schweitzer">
-                                <option value="Jeff Sentman">
-                                <option value="John Crosby">
-                                <option value="Lea Hart">
-                                <option value="Logan Barber">
-                                <option value="Olivia Crisp">
-                                <option value="Sara Kuessner">
-                                <option value="Stan Reeder">
-                                <option value="Trevorr Beaver">
+                            <input type="text" id="suterra_contact" name="suterra_contact" list="staff-contacts" placeholder="Start typing name...">
+                            <datalist id="staff-contacts">
+                                <?php foreach ($staff_contacts as $contact): ?>
+                                    <option value="<?php echo htmlspecialchars($contact); ?>">
+                                <?php endforeach; ?>
                             </datalist>
                         </div>
                         
@@ -479,13 +508,13 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
          * Handles all visitor check-in/check-out functionality including:
          * - Form submission and validation
          * - Returning visitor auto-fill
-         * - Smartsheet integration for contractor training
+         * - External form integration for contractor training
          * - Real-time visitor list updates
          */
         class VisitorSystem {
             constructor() {
-                // Smartsheet form URL for contractor training
-                this.smartsheetFormUrl = 'https://app.smartsheet.com/b/form/dbe783baf6fb47a6b886b96d54e4c770';
+                // External form URL for contractor training (if configured)
+                this.externalFormUrl = '<?php echo defined('EXTERNAL_FORM_URL') ? EXTERNAL_FORM_URL : 'https://app.smartsheet.com/b/form/dbe783baf6fb47a6b886b96d54e4c770'; ?>';
                 
                 // Current check-in state
                 this.currentVisitorData = null;
@@ -494,6 +523,9 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
                 
                 // Unique tablet identifier for tracking
                 this.tabletId = this.getTabletId();
+                
+                // Configured timezone
+                this.timezone = '<?php echo defined('TIMEZONE') ? TIMEZONE : 'America/Los_Angeles'; ?>';
                 
                 this.init();
             }
@@ -623,13 +655,13 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
                     document.getElementById('company-indicator').innerHTML = '<span class="auto-fill-indicator">Auto-filled</span>';
                 }
                 
-                // Auto-fill suterra_contact if available
-                const suterraContactField = document.getElementById('suterra_contact');
-                if (visitor.suterra_contact && !suterraContactField.value) {
-                    suterraContactField.value = visitor.suterra_contact;
-                    suterraContactField.classList.add('auto-filled');
-                    suterraContactField.style.borderColor = '#4caf50';
-                    suterraContactField.style.background = '#e8f5e8';
+                // Auto-fill staff contact if available
+                const staffContactField = document.getElementById('suterra_contact');
+                if (visitor.staff_contact && !staffContactField.value) {
+                    staffContactField.value = visitor.staff_contact;
+                    staffContactField.classList.add('auto-filled');
+                    staffContactField.style.borderColor = '#4caf50';
+                    staffContactField.style.background = '#e8f5e8';
                 }
                 
                 const typeText = visitor.suggested_visitor_type === 'contractor' ? 'contractor' : 'visitor';
@@ -638,7 +670,7 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
             
             /**
              * Handle check-in form submission
-             * Routes to Smartsheet for contractors needing training, direct check-in otherwise
+             * Routes to external form for contractors needing training, direct check-in otherwise
              */
             async handleCheckIn() {
                 // Validate email before submitting
@@ -677,12 +709,12 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
                     
                     if (result.success) {
                         if (result.needs_orientation) {
-                            // Contractor needs training - route to Smartsheet
+                            // Contractor needs training - route to external form
                             this.currentVisitorData = data;
                             this.currentVisitorData.visitor_id = result.visitor_id;
                             this.currentVisitorType = result.visitor_type || data.visitor_type;
                             this.trainingExpired = result.training_expired || false;
-                            this.openSmartsheetForm();
+                            this.openExternalForm();
                         } else {
                             // Direct check-in successful
                             let message = result.message;
@@ -702,29 +734,29 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
             }
             
             /**
-             * Open pre-filled Smartsheet form for contractor training
+             * Open pre-filled external form for contractor training
              * Called for new contractors or those with expired training
              */
-            openSmartsheetForm() {
+            openExternalForm() {
                 if (!this.currentVisitorData) return;
                 
-                // Build pre-filled Smartsheet URL with visitor data
+                // Build pre-filled form URL with visitor data
                 const name = encodeURIComponent(this.currentVisitorData.name);
                 const company = encodeURIComponent(this.currentVisitorData.company);
                 const email = encodeURIComponent(this.currentVisitorData.email);
                 
-                const prefilledUrl = `${this.smartsheetFormUrl}?Name=${name}&Company=${company}&Email=${email}`;
+                const prefilledUrl = `${this.externalFormUrl}?Name=${name}&Company=${company}&Email=${email}`;
                 
                 // Create modal explaining what's happening
                 const modal = document.createElement('div');
                 modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:1001;';
                 
                 const container = document.createElement('div');
-                container.style.cssText = 'background:white;padding:30px;border-radius:15px;max-width:500px;text-align:center;border:3px solid #5A7654;';
+                container.style.cssText = 'background:white;padding:30px;border-radius:15px;max-width:500px;text-align:center;border:3px solid var(--color-primary);';
                 
                 const title = document.createElement('h2');
                 title.textContent = this.trainingExpired ? '📋 Training Renewal Required' : '📋 Contractor Training Required';
-                title.style.cssText = 'color:#5A7654;margin-bottom:20px;font-size:1.5em;';
+                title.style.cssText = 'color:var(--color-primary);margin-bottom:20px;font-size:1.5em;';
                 
                 const message = document.createElement('p');
                 if (this.trainingExpired) {
@@ -747,7 +779,7 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
                     <p style="background:#f8f9fa;padding:15px;border-radius:8px;margin-bottom:20px;font-size:0.9em;color:#666;">
                         <strong>Instructions:</strong><br>
                         1. Click "Complete Training Form" to open the form<br>
-                        2. Select your Suterra contact from the dropdown<br>
+                        2. Select who you're visiting from the dropdown<br>
                         3. Complete the training questions<br>
                         4. You will be automatically checked in after opening the form
                     </p>
@@ -755,9 +787,9 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
                 
                 const formBtn = document.createElement('button');
                 formBtn.textContent = '📝 Complete Training Form';
-                formBtn.style.cssText = 'background:#5A7654;color:white;border:none;padding:15px 25px;border-radius:8px;cursor:pointer;font-weight:600;font-size:1.1em;width:100%;';
+                formBtn.style.cssText = 'background:var(--color-primary);color:white;border:none;padding:15px 25px;border-radius:8px;cursor:pointer;font-weight:600;font-size:1.1em;width:100%;';
                 formBtn.onclick = () => {
-                    // Open the pre-filled Smartsheet form in new window
+                    // Open the pre-filled external form in new window
                     window.open(prefilledUrl, '_blank', 'width=1000,height=700,scrollbars=yes,resizable=yes');
                     
                     // Close modal
@@ -773,7 +805,7 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
             }
             
             /**
-             * Complete contractor check-in after Smartsheet form is opened
+             * Complete contractor check-in after external form is opened
              */
             async completeContractorCheckin() {
                 if (!this.currentVisitorData) return;
@@ -845,7 +877,7 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
                     <div class="visitor-card">
                         <div class="visitor-name">${this.escapeHtml(visitor.name)}</div>
                         <div class="visitor-company">${this.escapeHtml(visitor.company)}</div>
-                        <div class="visitor-time">Checked in: ${this.formatDateTime(visitor.check_in_time)} PST</div>
+                        <div class="visitor-time">Checked in: ${this.formatDateTime(visitor.check_in_time)}</div>
                         <button class="checkout-btn" onclick="visitorSystem.checkOut(${visitor.id})">Check Out</button>
                     </div>
                 `).join('');
@@ -962,7 +994,7 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
             }
             
             /**
-             * Format datetime for display in PST
+             * Format datetime for display
              * @param {string} dateTimeString - ISO datetime string
              * @returns {string} Formatted datetime string
              */
@@ -975,7 +1007,7 @@ if (!file_exists(__DIR__ . '/data/visitors.db')) {
                     }
                     
                     return date.toLocaleString('en-US', {
-                        timeZone: 'America/Los_Angeles',
+                        timeZone: this.timezone,
                         month: 'short',
                         day: 'numeric',
                         hour: '2-digit',
