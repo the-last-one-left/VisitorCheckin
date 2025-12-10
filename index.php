@@ -440,6 +440,7 @@ $accent_rgb = hexToRgb($color_accent);
                 
                 <div id="checkin-form">
                     <form id="visitor-form">
+                        <?php if (defined('ENABLE_TRAINING_MANAGEMENT') && ENABLE_TRAINING_MANAGEMENT): ?>
                         <div class="form-group">
                             <label for="visitor_type">Visitor Type *</label>
                             <select id="visitor_type" name="visitor_type" required>
@@ -448,6 +449,9 @@ $accent_rgb = hexToRgb($color_accent);
                                 <option value="contractor">Contractor</option>
                             </select>
                         </div>
+                        <?php else: ?>
+                        <input type="hidden" id="visitor_type" name="visitor_type" value="visitor">
+                        <?php endif; ?>
                         
                         <div class="form-group">
                             <label for="name">Full Name *</label>

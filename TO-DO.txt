@@ -1,0 +1,9 @@
+When using contractor and selecting a video file, I am still presented with a redirect to an external form - the workflow should be if they select video in conf, it plays an .mp4 video in res, we should allow the user to upload this video during configuration state, if form is selected they are redirected to external form, if both is selected we do both.
+
+The external form is a production form for a client, this should be a placeholder in the code unless it is set with config
+
+We should add another option to the config for contractor only, this will act just like vistor only where the selector is removed in the main index, but in this conf the training data is shown
+
+The readme contains references to documentation that does not exist, please do 2 things, review my repository for YeylandWutani (https://github.com/the-last-one-left/YeylandWutani) for example of the company theme, and review THIS repo to remove references for missing documentation and flush out our readme
+
+Linux installer needs tested

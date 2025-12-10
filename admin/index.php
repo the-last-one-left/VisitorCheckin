@@ -592,7 +592,9 @@ $secondary_rgb = hexToRgb($color_secondary);
             <a href="../index.php" class="btn">&larr; Back to Check-in</a>
             <button id="export-csv" class="btn btn-success">Export CSV Report</button>
             <button id="backup-db" class="btn btn-success">Backup Database</button>
+            <?php if (defined('ENABLE_TRAINING_MANAGEMENT') && ENABLE_TRAINING_MANAGEMENT): ?>
             <button id="import-training" class="btn btn-warning">Import Training Data</button>
+            <?php endif; ?>
             <button id="refresh-data" class="btn">Refresh Data</button>
             <button id="clear-visits" class="btn btn-warning">Clear Visit History</button>
             <a href="logout.php" class="btn btn-danger">Logout</a>
@@ -640,6 +642,7 @@ $secondary_rgb = hexToRgb($color_secondary);
             </div>
         </div>
         
+        <?php if (defined('ENABLE_TRAINING_MANAGEMENT') && ENABLE_TRAINING_MANAGEMENT): ?>
         <!-- Training Management Section -->
         <div class="section">
             <h2 class="section-title">Training Management</h2>
@@ -658,6 +661,7 @@ $secondary_rgb = hexToRgb($color_secondary);
                 <div class="loading">Loading training alerts...</div>
             </div>
         </div>
+        <?php endif; ?>
         
         <!-- Database Info Section (moved to bottom) -->
         <div class="section">
@@ -748,21 +752,34 @@ $secondary_rgb = hexToRgb($color_secondary);
                     this.clearVisits();
                 });
                 
-                document.getElementById('import-training').addEventListener('click', () => {
-                    this.showTrainingImport();
-                });
+                // Only bind training import if button exists
+                const importBtn = document.getElementById('import-training');
+                if (importBtn) {
+                    importBtn.addEventListener('click', () => {
+                        this.showTrainingImport();
+                    });
+                }
             }
             
             async loadData() {
                 try {
-                    await Promise.all([
+
+                    const promises = [
                         this.loadCurrentVisitors(),
                         this.loadRecentVisits(),
                         this.loadStatistics(),
-                        this.loadDatabaseInfo(),
-                        this.loadTrainingManagement(),
-                        this.loadTrainingAlerts()
-                    ]);
+                        this.loadDatabaseInfo()
+                    ];
+                    
+                    // Only load training data if sections exist
+                    if (document.getElementById('training-management')) {
+                        promises.push(this.loadTrainingManagement());
+                    }
+                    if (document.getElementById('training-alerts')) {
+                        promises.push(this.loadTrainingAlerts());
+                    }
+                    
+                    await Promise.all(promises);
                 } catch (error) {
                     console.error('Error loading data:', error);
                 }
