@@ -119,13 +119,6 @@ Both installers handle:
 - ✅ Firewall rules
 - ✅ Health validation
 
-### Documentation
-
-Complete documentation available in `docs/` folder or outputs:
-- **CROSS_PLATFORM_DEPLOYMENT.md** - Complete deployment guide
-- **PROJECT_COMPLETE.md** - Full project documentation
-- **REFACTORING_SUMMARY.md** - Before/after comparison
-
 ---
 
 ## 🎨 Configuration
