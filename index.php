@@ -10,17 +10,17 @@
  * - Dual visitor type support (Contractor/General Visitor)
  * - Auto-fill for returning visitors
  * - Real-time phone/email validation
- * - External form integration for contractor training
+ * - Video orientation playback OR external form integration for contractor training
  * - Current visitor display with check-out capability
  * 
  * Flow Logic:
- * - Contractors (new/expired training): Pre-filled external form → Check in
- * - Contractors (valid training): Direct check in
- * - Visitors (any): Direct check in
+ * - Contractors (new/expired training): Video/Form/Both based on config → Check in
+ * - Contractors (valid training): Direct check-in
+ * - Visitors (any): Direct check-in
  * 
  * @package    VisitorManagement
  * @author     Yeyland Wutani LLC <yeyland.wutani@tcpip.network>
- * @version    2.1
+ * @version    2.2
  */
 
 // Load configuration
@@ -47,6 +47,31 @@ $logo_path = defined('LOGO_PATH') ? LOGO_PATH : 'sut-primary-logo.svg';
 $color_primary = defined('COLOR_PRIMARY') ? COLOR_PRIMARY : '#0066CC';
 $color_secondary = defined('COLOR_SECONDARY') ? COLOR_SECONDARY : '#0052A3';
 $color_accent = defined('COLOR_ACCENT') ? COLOR_ACCENT : '#8B4513';
+
+// ============================================================================
+// CONTRACTOR ORIENTATION CONFIGURATION
+// Get contractor orientation settings from visitor types config
+// ============================================================================
+
+$contractor_config = get_visitor_type('contractor');
+$has_video = false;
+$has_form = false;
+$video_path = '';
+$external_form_url = '';
+
+if ($contractor_config) {
+    // Check for video orientation
+    if (!empty($contractor_config['video_path']) && file_exists(__DIR__ . '/' . $contractor_config['video_path'])) {
+        $has_video = true;
+        $video_path = $contractor_config['video_path'];
+    }
+    
+    // Check for external form (Smartsheet or other)
+    if (!empty($contractor_config['smartsheet_url'])) {
+        $has_form = true;
+        $external_form_url = $contractor_config['smartsheet_url'];
+    }
+}
 
 // Get staff contacts for dropdown
 $staff_contacts = function_exists('get_staff_contacts') ? get_staff_contacts() : [];
@@ -381,6 +406,74 @@ $accent_rgb = hexToRgb($color_accent);
             margin-top: 50px;
         }
         
+        /* Video Player Modal */
+        .video-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        
+        .video-modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 90%;
+            max-height: 90%;
+            text-align: center;
+            position: relative;
+        }
+        
+        .video-modal video {
+            width: 100%;
+            max-height: 70vh;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .video-modal h2 {
+            color: var(--color-primary);
+            margin-bottom: 20px;
+        }
+        
+        .video-controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .btn-video {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-video-primary {
+            background: var(--color-primary);
+            color: white;
+        }
+        
+        .btn-video-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-video:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
         @media (max-width: 768px) {
             .main-content {
                 flex-direction: column;
@@ -412,6 +505,10 @@ $accent_rgb = hexToRgb($color_accent);
                 position: static;
                 display: inline-block;
                 margin-top: 15px;
+            }
+            
+            .video-modal-content {
+                padding: 15px;
             }
         }
     </style>
@@ -512,18 +609,23 @@ $accent_rgb = hexToRgb($color_accent);
          * Handles all visitor check-in/check-out functionality including:
          * - Form submission and validation
          * - Returning visitor auto-fill
+         * - Video orientation playback
          * - External form integration for contractor training
          * - Real-time visitor list updates
          */
         class VisitorSystem {
             constructor() {
-                // External form URL for contractor training (if configured)
-                this.externalFormUrl = '<?php echo defined('EXTERNAL_FORM_URL') ? EXTERNAL_FORM_URL : 'https://app.smartsheet.com/b/form/dbe783baf6fb47a6b886b96d54e4c770'; ?>';
+                // Contractor orientation configuration from PHP
+                this.hasVideo = <?php echo $has_video ? 'true' : 'false'; ?>;
+                this.hasForm = <?php echo $has_form ? 'true' : 'false'; ?>;
+                this.videoPath = '<?php echo $video_path; ?>';
+                this.externalFormUrl = '<?php echo addslashes($external_form_url); ?>';
                 
                 // Current check-in state
                 this.currentVisitorData = null;
                 this.currentVisitorType = null;
                 this.trainingExpired = false;
+                this.videoCompleted = false;
                 
                 // Unique tablet identifier for tracking
                 this.tabletId = this.getTabletId();
@@ -674,7 +776,7 @@ $accent_rgb = hexToRgb($color_accent);
             
             /**
              * Handle check-in form submission
-             * Routes to external form for contractors needing training, direct check-in otherwise
+             * Routes to video/external form for contractors needing training, direct check-in otherwise
              */
             async handleCheckIn() {
                 // Validate email before submitting
@@ -713,12 +815,27 @@ $accent_rgb = hexToRgb($color_accent);
                     
                     if (result.success) {
                         if (result.needs_orientation) {
-                            // Contractor needs training - route to external form
+                            // Contractor needs training - route based on config
                             this.currentVisitorData = data;
                             this.currentVisitorData.visitor_id = result.visitor_id;
                             this.currentVisitorType = result.visitor_type || data.visitor_type;
                             this.trainingExpired = result.training_expired || false;
-                            this.openExternalForm();
+                            this.videoCompleted = false;
+                            
+                            // Check what orientation methods are configured
+                            if (this.hasVideo && this.hasForm) {
+                                // Both video and form - show video first
+                                this.showOrientationVideo();
+                            } else if (this.hasVideo && !this.hasForm) {
+                                // Video only
+                                this.showOrientationVideo();
+                            } else if (!this.hasVideo && this.hasForm) {
+                                // Form only
+                                this.openExternalForm();
+                            } else {
+                                // Neither configured - this shouldn't happen but handle gracefully
+                                this.showAlert('error', 'Orientation is required but not configured. Please contact administrator.');
+                            }
                         } else {
                             // Direct check-in successful
                             let message = result.message;
@@ -738,11 +855,131 @@ $accent_rgb = hexToRgb($color_accent);
             }
             
             /**
+             * Show orientation video modal
+             * Called for contractors requiring video orientation
+             */
+            showOrientationVideo() {
+                if (!this.currentVisitorData || !this.hasVideo) return;
+                
+                // Create video modal
+                const modal = document.createElement('div');
+                modal.className = 'video-modal';
+                modal.id = 'videoModal';
+                
+                const modalContent = document.createElement('div');
+                modalContent.className = 'video-modal-content';
+                
+                const title = document.createElement('h2');
+                title.textContent = this.trainingExpired ? '📋 Training Renewal Required' : '📋 Contractor Orientation Required';
+                
+                const video = document.createElement('video');
+                video.id = 'orientationVideo';
+                video.controls = true;
+                video.autoplay = true;
+                video.src = this.videoPath;
+                
+                const instructions = document.createElement('p');
+                instructions.style.marginBottom = '20px';
+                instructions.textContent = 'Please watch the complete orientation video before continuing.';
+                
+                const controls = document.createElement('div');
+                controls.className = 'video-controls';
+                
+                const completeBtn = document.createElement('button');
+                completeBtn.textContent = 'Complete Orientation';
+                completeBtn.className = 'btn-video btn-video-primary';
+                completeBtn.disabled = true;
+                completeBtn.id = 'completeOrientationBtn';
+                
+                // Enable complete button when video ends
+                video.addEventListener('ended', () => {
+                    completeBtn.disabled = false;
+                    this.videoCompleted = true;
+                });
+                
+                completeBtn.onclick = () => {
+                    document.body.removeChild(modal);
+                    
+                    // If form is also configured, offer to fill it out
+                    if (this.hasForm) {
+                        this.offerExternalForm();
+                    } else {
+                        // Video only - complete check-in
+                        this.completeContractorCheckin(true, false);
+                    }
+                };
+                
+                controls.appendChild(completeBtn);
+                
+                // Add skip button if form is also available (for returning contractors)
+                if (this.hasForm) {
+                    const skipBtn = document.createElement('button');
+                    skipBtn.textContent = 'Skip to Form';
+                    skipBtn.className = 'btn-video btn-video-secondary';
+                    skipBtn.onclick = () => {
+                        video.pause();
+                        document.body.removeChild(modal);
+                        this.openExternalForm();
+                    };
+                    controls.appendChild(skipBtn);
+                }
+                
+                modalContent.append(title, video, instructions, controls);
+                modal.appendChild(modalContent);
+                document.body.appendChild(modal);
+            }
+            
+            /**
+             * Offer external form after video completion (when both are configured)
+             */
+            offerExternalForm() {
+                const modal = document.createElement('div');
+                modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:1001;';
+                
+                const container = document.createElement('div');
+                container.style.cssText = 'background:white;padding:30px;border-radius:15px;max-width:500px;text-align:center;border:3px solid var(--color-primary);';
+                
+                const title = document.createElement('h2');
+                title.textContent = '✅ Video Complete!';
+                title.style.cssText = 'color:var(--color-primary);margin-bottom:20px;';
+                
+                const message = document.createElement('p');
+                message.innerHTML = 'Would you like to complete the additional training form?<br><br>This is optional but recommended for comprehensive training documentation.';
+                message.style.cssText = 'font-size:1.1em;line-height:1.6;margin-bottom:25px;';
+                
+                const formBtn = document.createElement('button');
+                formBtn.textContent = '📝 Complete Training Form';
+                formBtn.style.cssText = 'background:var(--color-primary);color:white;border:none;padding:15px 25px;border-radius:8px;cursor:pointer;font-weight:600;font-size:1.1em;width:100%;margin-bottom:10px;';
+                formBtn.onclick = () => {
+                    document.body.removeChild(modal);
+                    this.openExternalForm();
+                };
+                
+                const skipBtn = document.createElement('button');
+                skipBtn.textContent = 'Skip Form & Check In';
+                skipBtn.style.cssText = 'background:#6c757d;color:white;border:none;padding:15px 25px;border-radius:8px;cursor:pointer;font-weight:600;font-size:1em;width:100%;';
+                skipBtn.onclick = () => {
+                    document.body.removeChild(modal);
+                    this.completeContractorCheckin(true, false);
+                };
+                
+                container.append(title, message, formBtn, skipBtn);
+                modal.appendChild(container);
+                document.body.appendChild(modal);
+            }
+            
+            /**
              * Open pre-filled external form for contractor training
-             * Called for new contractors or those with expired training
+             * Called for contractors needing form-based training
              */
             openExternalForm() {
                 if (!this.currentVisitorData) return;
+                
+                // Check if form URL is configured
+                if (!this.externalFormUrl || this.externalFormUrl.trim() === '') {
+                    this.showAlert('error', 'External training form is not configured. Please contact administrator.');
+                    return;
+                }
                 
                 // Build pre-filled form URL with visitor data
                 const name = encodeURIComponent(this.currentVisitorData.name);
@@ -783,8 +1020,8 @@ $accent_rgb = hexToRgb($color_accent);
                     <p style="background:#f8f9fa;padding:15px;border-radius:8px;margin-bottom:20px;font-size:0.9em;color:#666;">
                         <strong>Instructions:</strong><br>
                         1. Click "Complete Training Form" to open the form<br>
-                        2. Select who you're visiting from the dropdown<br>
-                        3. Complete the training questions<br>
+                        2. Fill out all required training information<br>
+                        3. Submit the form when complete<br>
                         4. You will be automatically checked in after opening the form
                     </p>
                 `;
@@ -800,7 +1037,7 @@ $accent_rgb = hexToRgb($color_accent);
                     document.body.removeChild(modal);
                     
                     // Complete the check-in process
-                    this.completeContractorCheckin();
+                    this.completeContractorCheckin(this.videoCompleted, true);
                 };
                 
                 container.append(title, message, instructions, formBtn);
@@ -809,13 +1046,17 @@ $accent_rgb = hexToRgb($color_accent);
             }
             
             /**
-             * Complete contractor check-in after external form is opened
+             * Complete contractor check-in after orientation (video/form)
+             * @param {boolean} videoCompleted - Whether video orientation was completed
+             * @param {boolean} formOpened - Whether external form was opened
              */
-            async completeContractorCheckin() {
+            async completeContractorCheckin(videoCompleted, formOpened) {
                 if (!this.currentVisitorData) return;
                 
                 // Mark contractor orientation as completed
                 this.currentVisitorData.contractor_orientation_completed = true;
+                this.currentVisitorData.video_orientation_completed = videoCompleted;
+                this.currentVisitorData.form_orientation_opened = formOpened;
                 
                 try {
                     const response = await fetch('api/checkin.php', {
@@ -834,9 +1075,20 @@ $accent_rgb = hexToRgb($color_accent);
                     }
                     
                     if (result.success) {
-                        const successMessage = this.trainingExpired 
-                            ? 'Training form opened and certification renewed! You are now checked in.'
-                            : 'Training form opened! You are now checked in.';
+                        let successMessage = '';
+                        
+                        if (videoCompleted && formOpened) {
+                            successMessage = 'Orientation complete! Training form opened. You are now checked in.';
+                        } else if (videoCompleted && !formOpened) {
+                            successMessage = 'Video orientation complete! You are now checked in.';
+                        } else if (!videoCompleted && formOpened) {
+                            successMessage = 'Training form opened! You are now checked in.';
+                        }
+                        
+                        if (this.trainingExpired) {
+                            successMessage += ' Your training certification has been renewed.';
+                        }
+                        
                         this.showAlert('success', successMessage);
                         this.resetForm();
                         await this.loadCurrentVisitors();
@@ -976,6 +1228,7 @@ $accent_rgb = hexToRgb($color_accent);
                 this.currentVisitorData = null;
                 this.currentVisitorType = null;
                 this.trainingExpired = false;
+                this.videoCompleted = false;
                 
                 // Clear auto-fill indicators
                 document.querySelectorAll('.auto-filled').forEach(field => field.classList.remove('auto-filled'));
